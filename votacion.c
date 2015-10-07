@@ -20,6 +20,12 @@ ERROR11: en caso de que aún queden votantes ingresados sin emitir su voto.
 
 */
 
+struct parametros {
+	char* comando;
+	char* param1;
+	char* param2;
+};
+
 struct mesa {
 	vector_t* boletas;
 	lista_t* votantes;
@@ -43,9 +49,9 @@ struct partido {
 };
 
 struct voto {
-	char id_partido;
-	char* nombre_partido;
-	char* nombre_candidato;
+	char id_partido_pres;
+	char id_partido_gob;
+	char id_partido_int;
 };
 
 /*************************************
@@ -132,43 +138,36 @@ void partido_destruir(partido_t *partido, void destruir_dato(void*)) {
 *        FUNCIONES AUXILIARES        *
 **************************************/
 
-char* obtener_parametro(const char* linea, char nro_param) {
+parametros_t* obtener_parametros(char* linea) {
 	const char delim[2] = " ";
 	char* param;
-	// Hago una copia de la línea para poder truncarla
-	char* linea_copia = strdup(linea);
-	// Obtengo el primer valor (comando)
-	param = strtok(linea_copia, delim);
-	if (nro_param == 0) {
-		free(linea_copia);
-		printf("%s\n", param);
-		return param;
-	}
-	while (param) {
+	parametros_t* parametros = malloc(sizeof(parametros_t));
+	if (!parametros) return NULL;
+	parametros->comando = NULL;
+	parametros->param1 = NULL;
+	parametros->param2 = NULL;
+	param = strtok(linea, delim);
+	parametros->comando = param;
+	if (param) {
 		param = strtok(NULL, delim);
-		// Devuelvo el segundo valor (primer parámetro)
-		if (nro_param == 1) {
-			free(linea_copia);
-			printf("%s\n", param);
-			return param;
-		}
+		parametros->param1 = param;
 	}
-	// Devuelvo el tercer valor (segundo parámetro)
-	free(linea_copia);
-	printf("%s\n", param);
-	return param;
+	param = strtok(NULL, delim);
+	if (param) parametros->param2 = param;
+	return parametros;
 }
 
 /*************************************
 *       PRIMITIVAS PRINCIPALES       *
 **************************************/
 
-char abrir(const char* linea, mesa_t* mesa) {
+char abrir(mesa_t* mesa, parametros_t* parametros) {
 	if (mesa_esta_abierta(mesa)) return 2;
 	
-	char* archivo_lista_csv = obtener_parametro(linea, 1);
-	char* archivo_padron_csv = obtener_parametro(linea, 2);
-	if ((strcmp(archivo_lista_csv, ARCHIVO_LISTA) != 0) || (strcmp(archivo_padron_csv, ARCHIVO_PADRON) != 0)) return 2;
+	if ((!parametros->param1) || (!parametros->param1)) return 1;
+	char* archivo_lista_csv = parametros->param1;
+	char* archivo_padron_csv = parametros->param2;
+	if ((strcmp(archivo_lista_csv, ARCHIVO_LISTA) != 0) || (strcmp(archivo_padron_csv, ARCHIVO_PADRON) != 0)) return 1;
 	// Confirmé que la lectura de parámetros fue correcta
 	
 	FILE *csv_lista = fopen(ARCHIVO_LISTA, "r");
@@ -219,11 +218,11 @@ char abrir(const char* linea, mesa_t* mesa) {
 	return 0;
 }
 
-char ingresar(const char* linea, mesa_t* mesa) {
+char ingresar(mesa_t* mesa, parametros_t* parametros) {
 	return 0;
 }
 
-char votar(const char* linea, mesa_t* mesa) {
+char votar(mesa_t* mesa, parametros_t* parametros) {
 	return 0;
 }
 
@@ -234,32 +233,27 @@ char cerrar(mesa_t* mesa) {
 int main(void) {
 	mesa_t* mesa = mesa_crear();
 	char resultado;
-	char* comando;
+	bool fin = false;
 	do {
 		char* linea = leer_linea(stdin);
-		comando = obtener_parametro(linea, 0);
-		switch(*comando) {
-			case 1:
-				resultado = abrir(linea, mesa);
-				break;
-			case 2:
-				resultado = ingresar(linea, mesa);
-				break;
-			case 3:
-				resultado = votar(linea, mesa);
-				break;
-			case 4:
-				resultado = cerrar(mesa);
-				break;
-			default:
-				printf("Comando erróneo. Ingrese nuevamente.\n");
+		parametros_t* parametros = obtener_parametros(linea);
+		if (strcmp(parametros->comando, "abrir") == 0) resultado = abrir(mesa, parametros);
+			else if (strcmp(parametros->comando, "ingresar") == 0) resultado = ingresar(mesa, parametros);
+				else if (strcmp(parametros->comando, "votar") == 0) resultado = votar(mesa, parametros);
+					else if (strcmp(parametros->comando, "cerrar") == 0) resultado = cerrar(mesa);
+						else {
+							parametros->comando = NULL;
+							printf("Comando erróneo. Ingrese nuevamente.\n");
+						}
+		if (parametros->comando) {
+			if (resultado == 0) printf("OK\n");
+			else printf("ERROR%d\n", resultado);
+			if ((strcmp(parametros->comando, "cerrar") == 0) && (resultado == 0)) fin = true;
 		}
-		if (resultado == 0) {
-			printf("OK\n");
-		} else printf("ERROR%d\n", resultado);
 		free(linea);
+		free(parametros);
 	// Repite el ciclo hasta que el comando que se haya podido cerrar la mesa correctamente
-	} while (*comando != 4 && resultado != 0);
+	} while (!fin);
 	mesa_destruir(mesa, free);
 	return 0;
 }

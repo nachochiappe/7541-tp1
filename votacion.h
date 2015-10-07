@@ -10,6 +10,9 @@
 
 // DEFINIR PRIMITIVAS Y ESTRUCTURAS AUXILIARES
 
+struct parametros;
+typedef struct parametros parametros_t;
+
 struct mesa;
 typedef struct mesa mesa_t;
 
