@@ -15,3 +15,9 @@ typedef struct mesa mesa_t;
 
 struct votante;
 typedef struct votante votante_t;
+
+struct partido;
+typedef struct partido partido_t;
+
+struct voto;
+typedef struct voto voto_t;
