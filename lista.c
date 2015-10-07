@@ -24,7 +24,7 @@ struct lista_iter {
 
 /* Función auxiliar para crear un nuevo nodo */
 
-nodo_t* nodo_crear(void* valor){
+nodo_t* nodo_lista_crear(void* valor){
 	nodo_t* nodo = malloc(sizeof(nodo_t));
 	if (!nodo)
 		return NULL;
@@ -53,7 +53,7 @@ bool lista_esta_vacia(const lista_t *lista) {
 }
 
 bool lista_insertar_primero(lista_t *lista, void *dato) {
-	nodo_t* nodo = nodo_crear(dato);
+	nodo_t* nodo = nodo_lista_crear(dato);
 	if (!nodo) return false;
 	nodo->siguiente = lista->inicio;
 	lista->inicio = nodo;
@@ -65,7 +65,7 @@ bool lista_insertar_primero(lista_t *lista, void *dato) {
 }
 
 bool lista_insertar_ultimo(lista_t *lista, void *dato) {
-	nodo_t* nodo = nodo_crear(dato);
+	nodo_t* nodo = nodo_lista_crear(dato);
 	if (!nodo) return false;
 	if (lista_esta_vacia(lista)) {
 		lista->inicio = nodo;
@@ -154,7 +154,7 @@ bool lista_insertar(lista_t *lista, lista_iter_t *iter, void *dato) {
 	}
 	// Si estoy en cualquier otra posición del iterador
 	else {
-		nodo_t* nodo = nodo_crear(dato);
+		nodo_t* nodo = nodo_lista_crear(dato);
 		if (!nodo) return false;
 		iter->anterior->siguiente = nodo;
 		nodo->siguiente = iter->actual;
