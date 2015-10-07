@@ -36,6 +36,7 @@ struct mesa {
 struct votante {
 	char* tipo_doc;
 	char* nro_doc;
+	//long int nro_doc;
 	bool ya_voto;
 	pila_t* operaciones;
 };
@@ -182,8 +183,10 @@ char abrir(mesa_t* mesa, parametros_t* parametros) {
 	// Lo voy a redimensionar en caso de que haya más de 5 partidos
 	vector_t* vector_boletas = vector_crear(MIN_CANT_PARTIDOS);
 	size_t cant_partidos = 0;
+	// Hago un primer parseo, lo descarto porque es la cabecera
+	fila_csv_t* linea_lista_parseada = parsear_linea_csv(linea_lista, 5);
 	while (linea_lista) {
-		fila_csv_t* linea_lista_parseada = parsear_linea_csv(linea_lista, 5);
+		linea_lista_parseada = parsear_linea_csv(linea_lista, 5);
 		char* id_partido = obtener_columna(linea_lista_parseada, 1);
 		/*char* nombre_partido = obtener_columna(linea_lista_parseada, 2);
 		char* presidente = obtener_columna(linea_lista_parseada, 3);
@@ -201,10 +204,12 @@ char abrir(mesa_t* mesa, parametros_t* parametros) {
 	// Proceso el archivo de padrones
 	char* linea_padron = leer_linea(csv_padron);
 	lista_t* lista_padrones = lista_crear();
+	// Hago un primer parseo, lo descarto porque es la cabecera
+	fila_csv_t* linea_padron_parseada = parsear_linea_csv(linea_padron, 2);
 	while (linea_padron) {
-		fila_csv_t* linea_padron_parseada = parsear_linea_csv(linea_padron, 2);
-		char* tipo_doc = obtener_columna(linea_padron_parseada, 1);
-		char* nro_doc = obtener_columna(linea_padron_parseada, 2);
+		linea_padron_parseada = parsear_linea_csv(linea_padron, 2);
+		char* tipo_doc = obtener_columna(linea_padron_parseada, 0);
+		char* nro_doc = obtener_columna(linea_padron_parseada, 1);
 		votante_t* votante = votante_crear(tipo_doc, nro_doc);
 		lista_insertar_primero(lista_padrones, votante);
 		linea_padron = leer_linea(csv_padron);
@@ -219,7 +224,24 @@ char abrir(mesa_t* mesa, parametros_t* parametros) {
 }
 
 char ingresar(mesa_t* mesa, parametros_t* parametros) {
-	return 0;
+	if (!mesa_esta_abierta(mesa)) return 3;
+	if ((!parametros->param1) || (!parametros->param2)) return 10;
+	char* tipo_doc = parametros->param1;
+	char* nro_doc = parametros->param2;
+	if (atoi(nro_doc) <= 0) return 4;
+	lista_iter_t* votantes_iter = lista_iter_crear(mesa->votantes);
+	while (!lista_iter_al_final(votantes_iter)) {
+		votante_t* votante = lista_iter_ver_actual(votantes_iter);
+		if ((strcmp(votante->tipo_doc, tipo_doc) == 0) && (strcmp(votante->nro_doc, nro_doc) == 0)) {
+			votante = lista_borrar(mesa->votantes, votantes_iter);
+			cola_encolar(mesa->votantes_en_espera, votante);
+			lista_iter_destruir(votantes_iter);
+			return 0;
+		}
+		lista_iter_avanzar(votantes_iter);
+	}
+	lista_iter_destruir(votantes_iter);
+	return 10;
 }
 
 char votar(mesa_t* mesa, parametros_t* parametros) {
