@@ -158,6 +158,45 @@ parametros_t* obtener_parametros(char* linea) {
 	return parametros;
 }
 
+pila_t* deshacer_voto(mesa_t* mesa, pila_t* pila_votacion) {
+	// FALTA TODO
+	return pila_votacion;
+}
+
+char iniciar_votacion(mesa_t* mesa, votante_t* votante_cola) {
+	char* linea = leer_linea(stdin);
+	if (!linea || strcmp(linea, "") == 0) {
+		free(linea);
+		break;
+	}
+	parametros_t* parametros = obtener_parametros(linea);
+	
+	// Si el comando NO es 'votar' devuelvo ERROR10
+	if (strcmp(parametros->comando, "votar") != 0) {
+		free(linea);
+		free(parametros);
+		return 10;
+	}
+	
+	// Creo la pila correspondiente al proceso de votación
+	pila_t* pila_votacion = pila_crear();
+	if (!pila_votacion) return 10;
+	while (strcmp(parametros->param1, "fin") != 0) {
+		if (strcmp(parametros->param1, "deshacer") == 0) {
+			// Si no existen operaciones para deshacer imprimo ERROR8
+			// No hago 'return' porque debería liberar la pila y la pierdo
+			if (pila_esta_vacia(pila_votacion)) printf("ERROR8\n");
+			else pila_votacion = deshacer_voto(mesa, pila_votacion);
+		}
+		char* linea = leer_linea(stdin);
+		if (!linea || strcmp(linea, "") == 0) break;
+		parametros_t* parametros = obtener_parametros(linea);
+	}
+	// FALTA FINALIZAR VOTACION CUANDO ESCRIBE 'FIN'
+	free(linea);
+	free(parametros);
+}
+
 /*************************************
 *       PRIMITIVAS PRINCIPALES       *
 **************************************/
@@ -229,23 +268,37 @@ char ingresar(mesa_t* mesa, parametros_t* parametros) {
 	char* tipo_doc = parametros->param1;
 	char* nro_doc = parametros->param2;
 	if (atoi(nro_doc) <= 0) return 4;
-	lista_iter_t* votantes_iter = lista_iter_crear(mesa->votantes);
-	while (!lista_iter_al_final(votantes_iter)) {
-		votante_t* votante = lista_iter_ver_actual(votantes_iter);
-		if ((strcmp(votante->tipo_doc, tipo_doc) == 0) && (strcmp(votante->nro_doc, nro_doc) == 0)) {
-			votante = lista_borrar(mesa->votantes, votantes_iter);
-			cola_encolar(mesa->votantes_en_espera, votante);
-			lista_iter_destruir(votantes_iter);
-			return 0;
-		}
-		lista_iter_avanzar(votantes_iter);
-	}
-	lista_iter_destruir(votantes_iter);
-	return 4;
+	votante_t* votante = votante_crear(tipo_doc, nro_doc);
+	cola_encolar(mesa->votantes_en_espera, votante);
+	return 0;
 }
 
 char votar(mesa_t* mesa, parametros_t* parametros) {
-	return 0;
+	if (!mesa_esta_abierta(mesa)) return 3;
+	// Si el comando es 'inicio', inicia un ciclo de cargos para votar.
+	if (strcmp(parametros->param1, "inicio") == 0) {
+		votante_t* votante_cola = cola_desencolar(mesa->votantes_en_espera);
+		// Si no hay votantes en espera, devuelvo ERROR7
+		if (!votante_cola) return 7;
+		// Verifico si el votante está en el padrón
+		lista_iter_t* votantes_iter = lista_iter_crear(mesa->votantes);
+		while (!lista_iter_al_final(votantes_iter)) {
+			votante_t* votante_iter = lista_iter_ver_actual(votantes_iter);
+			// Si está en el padrón, inicio el proceso de votación
+			if ((strcmp(votante_iter->tipo_doc, votante_cola->tipo_doc) == 0) && (strcmp(votante_iter->nro_doc, votante_cola->nro_doc) == 0)) {
+				char resultado = iniciar_votacion(mesa, votante_cola);
+				free(votante_cola);
+				lista_iter_destruir(votantes_iter);
+				return resultado;
+			}
+			lista_iter_avanzar(votantes_iter);
+		}
+		lista_iter_destruir(votantes_iter);
+		// Si el número y tipo de documento no está en el archivo padron.csv devuelvo ERROR6
+		return 6;
+	}
+	// En cualquier otro caso no contemplado devuelvo ERROR10
+	return 10;
 }
 
 char cerrar(mesa_t* mesa) {
