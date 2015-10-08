@@ -167,7 +167,7 @@ char iniciar_votacion(mesa_t* mesa, votante_t* votante_cola) {
 	char* linea = leer_linea(stdin);
 	if (!linea || strcmp(linea, "") == 0) {
 		free(linea);
-		break;
+		return 10;
 	}
 	parametros_t* parametros = obtener_parametros(linea);
 	
@@ -181,20 +181,18 @@ char iniciar_votacion(mesa_t* mesa, votante_t* votante_cola) {
 	// Creo la pila correspondiente al proceso de votación
 	pila_t* pila_votacion = pila_crear();
 	if (!pila_votacion) return 10;
-	while (strcmp(parametros->param1, "fin") != 0) {
+	if (strcmp(parametros->param1, "fin") != 0) {
 		if (strcmp(parametros->param1, "deshacer") == 0) {
 			// Si no existen operaciones para deshacer imprimo ERROR8
 			// No hago 'return' porque debería liberar la pila y la pierdo
 			if (pila_esta_vacia(pila_votacion)) printf("ERROR8\n");
 			else pila_votacion = deshacer_voto(mesa, pila_votacion);
 		}
-		char* linea = leer_linea(stdin);
-		if (!linea || strcmp(linea, "") == 0) break;
-		parametros_t* parametros = obtener_parametros(linea);
 	}
 	// FALTA FINALIZAR VOTACION CUANDO ESCRIBE 'FIN'
 	free(linea);
 	free(parametros);
+	return 0;
 }
 
 /*************************************
