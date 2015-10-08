@@ -163,13 +163,13 @@ parametros_t* obtener_parametros(char* linea) {
 **************************************/
 
 char abrir(mesa_t* mesa, parametros_t* parametros) {
-	if (mesa_esta_abierta(mesa)) return 2;
-	
-	if ((!parametros->param1) || (!parametros->param1)) return 1;
+	if ((!parametros->param1) || (!parametros->param2)) return 1;
 	char* archivo_lista_csv = parametros->param1;
 	char* archivo_padron_csv = parametros->param2;
 	if ((strcmp(archivo_lista_csv, ARCHIVO_LISTA) != 0) || (strcmp(archivo_padron_csv, ARCHIVO_PADRON) != 0)) return 1;
 	// Confirmé que la lectura de parámetros fue correcta
+	
+	if (mesa_esta_abierta(mesa)) return 2;
 	
 	FILE *csv_lista = fopen(ARCHIVO_LISTA, "r");
 	if (!csv_lista) return 1;
@@ -225,7 +225,7 @@ char abrir(mesa_t* mesa, parametros_t* parametros) {
 
 char ingresar(mesa_t* mesa, parametros_t* parametros) {
 	if (!mesa_esta_abierta(mesa)) return 3;
-	if ((!parametros->param1) || (!parametros->param2)) return 10;
+	if ((!parametros->param1) || (!parametros->param2)) return 4;
 	char* tipo_doc = parametros->param1;
 	char* nro_doc = parametros->param2;
 	if (atoi(nro_doc) <= 0) return 4;
@@ -241,7 +241,7 @@ char ingresar(mesa_t* mesa, parametros_t* parametros) {
 		lista_iter_avanzar(votantes_iter);
 	}
 	lista_iter_destruir(votantes_iter);
-	return 10;
+	return 4;
 }
 
 char votar(mesa_t* mesa, parametros_t* parametros) {
@@ -258,6 +258,7 @@ int main(void) {
 	bool fin = false;
 	do {
 		char* linea = leer_linea(stdin);
+		if (!linea || strcmp(linea, "") == 0) break;
 		parametros_t* parametros = obtener_parametros(linea);
 		if (strcmp(parametros->comando, "abrir") == 0) resultado = abrir(mesa, parametros);
 			else if (strcmp(parametros->comando, "ingresar") == 0) resultado = ingresar(mesa, parametros);
