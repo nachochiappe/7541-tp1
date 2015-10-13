@@ -41,7 +41,7 @@ void votante_destruir(votante_t *votante, void destruir_dato(void*));
 
 /* PARTIDO  */
 
-partido_t* partido_crear(char id_partido, char* nombre_partido, char* presidente, char* gobernador, char* intendente);
+partido_t* partido_crear(char* id_partido, char* nombre_partido, char* presidente, char* gobernador, char* intendente);
 
 void partido_destruir(partido_t *partido, void destruir_dato(void*));
 
@@ -59,4 +59,4 @@ char votar(mesa_t* mesa, parametros_t* parametros);
 
 // Verifica que la mesa pueda cerrarse (si todos los votantes
 // en espera ya votaron), e imprime el resultado de las elecciones.
-char cerrar(mesa_t* mesa);
+char cerrar(mesa_t* mesa, parametros_t* parametros);
