@@ -202,11 +202,11 @@ void imprimir_candidatos(mesa_t* mesa, size_t cantidad_partidos, int cargo){
 		partido_t* partido = vector_obtener(mesa->boletas, i);
 		char* nombre_partido = partido->nombre_partido;
 		if (cargo == 1)
-			printf ("%i. %s: %s\n", i+1, nombre_partido, partido->presidente);
+			printf ("%zu. %s: %s\n", i+1, nombre_partido, partido->presidente);
 		else if (cargo == 2)
-			printf ("%i. %s: %s\n", i+1, nombre_partido, partido->gobernador);
+			printf ("%zu. %s: %s\n", i+1, nombre_partido, partido->gobernador);
 		else
-			printf ("%i. %s: %s\n", i+1, nombre_partido, partido->intendente);
+			printf ("%zu. %s: %s\n", i+1, nombre_partido, partido->intendente);
 	}
 }
 
@@ -312,10 +312,13 @@ char abrir(mesa_t* mesa, parametros_t* parametros) {
 
 char ingresar(mesa_t* mesa, parametros_t* parametros) {
 	if (!mesa_esta_abierta(mesa)) return 3;
-	if ((!parametros->param1) || (!parametros->param2)) return 10;
+	if ((!parametros->param1) || (!parametros->param2)) return 4;
 	char* tipo_doc = parametros->param1;
 	char* nro_doc = parametros->param2;
 	if (atoi(nro_doc) <= 0) return 4;
+	votante_t* votante = votante_crear(tipo_doc, nro_doc);
+	cola_encolar(mesa->votantes_en_espera, votante);
+	return 0;
 	lista_iter_t* votantes_iter = lista_iter_crear(mesa->votantes);
 	while (!lista_iter_al_final(votantes_iter)) {
 		votante_t* votante = lista_iter_ver_actual(votantes_iter);
@@ -337,7 +340,8 @@ char ingresar(mesa_t* mesa, parametros_t* parametros) {
 // proceso, devolviendo el numero de error (o cero) en donde corresponda.
 char votar(mesa_t* mesa, parametros_t* parametros) {
 	char num_error = 10;
-	if (!lista_esta_vacia(mesa->votantes)) return 7;
+	if (!mesa_esta_abierta(mesa)) return 3;
+	if (!mesa->votantes_en_espera) return 7;
 	if (parametros->param2 != NULL || !parametros->param1) return num_error; // 'votar' lleva solamente un parametro (no puede ser mas de uno, tampoco ninguno).
 	if (strcmp(parametros->param1, "inicio") == 0){
 		num_error = iniciar_votacion(mesa);
@@ -429,6 +433,7 @@ int main(void) {
 	bool fin = false;
 	do {
 		char* linea = leer_linea(stdin);
+		if (!linea || strcmp(linea, "") == 0) break;
 		parametros_t* parametros = obtener_parametros(linea);
 		if (strcmp(parametros->comando, "abrir") == 0) resultado = abrir(mesa, parametros);
 			else if (strcmp(parametros->comando, "ingresar") == 0) resultado = ingresar(mesa, parametros);
