@@ -3,34 +3,52 @@
 
 // Funciones del alumno.
 
-void vector_destruir(vector_t* vector) {
-	free(vector->datos);
+/* Devuelve el tamanio del vector segun el valor del miembro 'tam' de la 
+ * estructura 'vector'.*/
+size_t vector_obtener_tamanio(vector_t* vector){
+    return vector->tam;
+}
+
+/* Devuelve la cantidad de elementos dentro del vector.*/
+size_t vector_obtener_tamanio(vector_t* vector){
+    return vector->elementos;
+}
+
+/* Libera la memoria del miembro "datos" de la estructura "vector" pasada
+ * por parametro para luego liberar la de esta misma.*/
+void vector_destruir(vector_t* vector, void destruir_dato(void*)) {
+    if (destruir_dato != NULL){
+        size_t i = 0;
+        while (i != vector_obtener_tamanio(vector) && i < vector->elementos){
+            destruir_dato(vector->datos[i]);
+            i++;
+        }
+    }
+    free(vector->datos);
     free(vector);
 }
 
-bool vector_obtener(vector_t* vector, size_t pos, int* valor) {
-	if (pos < (vector->tam)) {
-		int *p;
-		p = (vector->datos + pos);
-		*valor = *p;
-		return true;
-	}
-    return false;
+/* Compara el tamanio con la posicion pasada por parametro. Si esta es
+ * mayor o igual, devuelve false, pero si es menor, asigna el valor del
+ * vector en esa posicion a la variable 'valor'. Finalmente, devuelve true.*/
+void* vector_obtener(vector_t* vector, size_t pos){
+    if (pos >= vector_obtener_tamanio(vector))
+        return NULL;
+    return vector->datos[pos];
 }
 
-bool vector_guardar(vector_t* vector, size_t pos, int valor) {
-	if (pos < (vector->tam)) {
-		int *p;
-		p = (vector->datos + pos);
-		*p = valor;
-		return true;
-	}
-	return false;
+/* Compara el tamanio del vector con la posicion pasada por parametro. Si
+ * esta es mayor o igual, devuelve false, mientras que si es menor, asigna el
+ * valor pasado por parametro a la posicion 'pos' del vector. Devuelve true.*/
+bool vector_guardar(vector_t* vector, size_t pos, void* valor){
+    if (pos >= vector_obtener_tamanio(vector))
+        return false;
+    vector->datos[pos] = valor;
+    if (vector->elementos <= pos)
+        vector->elementos++;
+    return true;
 }
 
-size_t vector_obtener_tamanio(vector_t* vector) {
-	return vector->tam;
-}
 
 
 // Funciones implementadas por la catedra.
@@ -39,20 +57,21 @@ vector_t* vector_crear(size_t tam) {
     vector_t* vector = malloc(sizeof(vector_t));
 
     if (vector == NULL) {
-	return NULL;
+	    return NULL;
     }
-    vector->datos = malloc(tam * sizeof(int));
+    vector->datos = malloc(tam * sizeof(void*));
 
     if (tam > 0 && vector->datos == NULL) {
         free(vector);
         return NULL;
     }
     vector->tam = tam;
+    vector->elementos = 0;
     return vector;
 }
 
 bool vector_redimensionar(vector_t* vector, size_t tam_nuevo) {
-    int* datos_nuevo = realloc(vector->datos, tam_nuevo * sizeof(int));
+    void** datos_nuevo = realloc(vector->datos, tam_nuevo * sizeof(void*));
 
     // Cuando tam_nuevo es 0, es correcto si se devuelve NULL.
     // En toda otra situación significa que falló el realloc.
