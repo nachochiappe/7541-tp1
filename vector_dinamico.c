@@ -10,7 +10,7 @@ size_t vector_obtener_tamanio(vector_t* vector){
 }
 
 /* Devuelve la cantidad de elementos dentro del vector.*/
-size_t vector_obtener_tamanio(vector_t* vector){
+size_t vector_cantidad_elementos(vector_t* vector){
     return vector->elementos;
 }
 
