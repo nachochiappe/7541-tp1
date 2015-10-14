@@ -92,7 +92,8 @@ votante_t* votante_crear(char* tipo_doc, char* nro_doc) {
 	votante->tipo_doc = tipo_doc;
 	votante->nro_doc = nro_doc;
 	votante->ya_voto = false;
-	votante->operaciones = NULL;
+	pila_t* pila_operaciones = pila_crear();
+	votante->operaciones = pila_operaciones;
 	return votante;
 }
 
@@ -158,43 +159,6 @@ parametros_t* obtener_parametros(char* linea) {
 	return parametros;
 }
 
-// Realiza las verificaciones necesarias para inicial el proceso de votacion.
-// Segun el error generado, se devolvera el numero correspondiente.
-// Si todo sale bien, devuelve 0.
-char iniciar_votacion(mesa_t* mesa){
-	if (!mesa_esta_abierta(mesa)) return 3;
-	votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
-	if (!votante) return 7; // La cola esta vacia, 'votante' = NULL (no hay votantes esperando).
-	if (votante->ya_voto){
-		cola_desencolar(mesa->votantes_en_espera);
-		return 5;
-	}
-	FILE *csv_padron = fopen(ARCHIVO_PADRON, "r");
-	if (!csv_padron) return 10; // Fallo al abrir el archivo.
-	char* linea_padron = leer_linea(csv_padron);
-	// Hago un primer parseo, lo descarto porque es la cabecera
-	bool existe = false;
-	fila_csv_t* linea_padron_parseada = parsear_linea_csv(linea_padron, 2);
-	while (linea_padron) {
-		linea_padron_parseada = parsear_linea_csv(linea_padron, 2);
-		char* tipo_doc = obtener_columna(linea_padron_parseada, 0);
-		char* nro_doc = obtener_columna(linea_padron_parseada, 1);
-		if (tipo_doc != votante->tipo_doc){
-			if (nro_doc != votante->nro_doc){
-				linea_padron = leer_linea(csv_padron);
-				continue;
-			}
-			return 10; // En caso que el tipo sea distinto pero el numero igual.
-		}
-		if (nro_doc == votante->nro_doc) existe = true; // Siendo el tipo igual, entonces existe.
-	}
-	free(linea_padron);
-
-	fclose(csv_padron);
-	if (!existe) return 6; // No se encontro el votante en el archivo ARCHIVO_PADRON.
-	return 0;
-}
-
 // Imprime, con un formato especifico, el nombre y candidato de todos los 
 // partidos en el archivo ARCHIVO_LISTA, segun los valores pasados por parametro.
 void imprimir_candidatos(mesa_t* mesa, size_t cantidad_partidos, int cargo){
@@ -202,11 +166,11 @@ void imprimir_candidatos(mesa_t* mesa, size_t cantidad_partidos, int cargo){
 		partido_t* partido = vector_obtener(mesa->boletas, i);
 		char* nombre_partido = partido->nombre_partido;
 		if (cargo == 1)
-			printf ("%zu. %s: %s\n", i+1, nombre_partido, partido->presidente);
+			printf ("%zu: %s: %s\n", i+1, nombre_partido, partido->presidente);
 		else if (cargo == 2)
-			printf ("%zu. %s: %s\n", i+1, nombre_partido, partido->gobernador);
+			printf ("%zu: %s: %s\n", i+1, nombre_partido, partido->gobernador);
 		else
-			printf ("%zu. %s: %s\n", i+1, nombre_partido, partido->intendente);
+			printf ("%zu: %s: %s\n", i+1, nombre_partido, partido->intendente);
 	}
 }
 
@@ -215,15 +179,15 @@ void imprimir_candidatos(mesa_t* mesa, size_t cantidad_partidos, int cargo){
 void votar_candidato(mesa_t* mesa, size_t num_operacion){
 	size_t cantidad_partidos = vector_cantidad_elementos(mesa->boletas);
 	if (num_operacion == 1){
-		printf ("Cargo ------ Presidente\n");
+		printf ("Cargo: Presidente\n");
 		imprimir_candidatos(mesa, cantidad_partidos, 1);
 	}
 	else if (num_operacion == 2){
-		printf ("Cargo ------ Gobernador\n");
+		printf ("Cargo: Gobernador\n");
 		imprimir_candidatos(mesa, cantidad_partidos, 2);
 	}
 	else{
-		printf ("Cargo ------ Intendente\n");
+		printf ("Cargo: Intendente\n");
 		imprimir_candidatos(mesa, cantidad_partidos, 3);
 	}
 }
@@ -235,7 +199,7 @@ void imprimir_resultado(mesa_t* mesa){
 	for (size_t i = 0; i < cantidad_partidos; i++){
 		partido_t* partido = vector_obtener(mesa->boletas, i);
 		char* nombre_partido = partido->nombre_partido;
-		printf ("\n%s:\n- Presidente: %i\n- Gobernador: %i\n- Intendente: %i\n", 
+		printf ("%s:\nPresidente: %i\nGobernador: %i\nIntendente: %i\n\n", 
 				nombre_partido, partido->votos_presi, partido->votos_gober, partido->votos_inten);
 	}
 }
@@ -245,10 +209,9 @@ void imprimir_resultado(mesa_t* mesa){
 **************************************/
 
 char abrir(mesa_t* mesa, parametros_t* parametros) {
-	if (mesa_esta_abierta(mesa)) return 2;
-	
 	// Confirmo que la lectura de parámetros fue correcta
 	if ((!parametros->param1) || (!parametros->param2)) return 1;
+	if (mesa_esta_abierta(mesa)) return 2;
 	char* archivo_lista_csv = parametros->param1;
 	char* archivo_padron_csv = parametros->param2;
 	if ((strcmp(archivo_lista_csv, ARCHIVO_LISTA) != 0) || (strcmp(archivo_padron_csv, ARCHIVO_PADRON) != 0)) return 1;
@@ -265,33 +228,40 @@ char abrir(mesa_t* mesa, parametros_t* parametros) {
 	// Lo voy a redimensionar en caso de que haya más de 5 partidos
 	vector_t* vector_boletas = vector_crear(MIN_CANT_PARTIDOS);
 	size_t cant_partidos = 0;
-	// Hago un primer parseo, lo descarto porque es la cabecera
-	fila_csv_t* linea_lista_parseada = parsear_linea_csv(linea_lista, 5);
+	// Hago una nueva lectura, ya que descarto la primera porque es la cabecera
+	linea_lista = leer_linea(csv_lista);
+	fila_csv_t* linea_lista_parseada;
 	while (linea_lista) {
 		linea_lista_parseada = parsear_linea_csv(linea_lista, 5);
-		char* id_partido = obtener_columna(linea_lista_parseada, 1);
-		char* nombre_partido = obtener_columna(linea_lista_parseada, 2);
-		char* presidente = obtener_columna(linea_lista_parseada, 3);
-		char* gobernador = obtener_columna(linea_lista_parseada, 4);
-		char* intendente = obtener_columna(linea_lista_parseada, 5);
+		char* id_partido = obtener_columna(linea_lista_parseada, 0);
+		char* nombre_partido = obtener_columna(linea_lista_parseada, 1);
+		char* presidente = obtener_columna(linea_lista_parseada, 2);
+		char* gobernador = obtener_columna(linea_lista_parseada, 3);
+		char* intendente = obtener_columna(linea_lista_parseada, 4);
 		partido_t* partido = partido_crear(id_partido, nombre_partido, presidente, gobernador, intendente);
 		if (cant_partidos == vector_obtener_tamanio(vector_boletas)){ 
-			if (!vector_redimensionar(vector_boletas, cant_partidos + MIN_CANT_PARTIDOS)) 
+			if (!vector_redimensionar(vector_boletas, cant_partidos + MIN_CANT_PARTIDOS)) {
+				fclose(csv_lista);
+				fclose(csv_padron);
+				destruir_fila_csv(linea_lista_parseada, false);
 				return 10; // Fallo la redimension
+			}
 		}
 		vector_guardar(vector_boletas, cant_partidos, partido); // Guarda en un vector dinamico de punteros genericos, un puntero al partido.
 		cant_partidos++;
 		linea_lista = leer_linea(csv_lista);
 	}
 	// Cierro el archivo de lista porque ya terminé de trabajar con él
+	destruir_fila_csv(linea_lista_parseada, false);
 	free(linea_lista);
 	fclose(csv_lista);
 	
 	// Proceso el archivo de padrones
 	char* linea_padron = leer_linea(csv_padron);
 	lista_t* lista_padrones = lista_crear();
-	// Hago un primer parseo, lo descarto porque es la cabecera
-	fila_csv_t* linea_padron_parseada = parsear_linea_csv(linea_padron, 2);
+	// Hago una nueva lectura, ya que descarto la primera porque es la cabecera
+	linea_padron = leer_linea(csv_padron);
+	fila_csv_t* linea_padron_parseada;
 	while (linea_padron) {
 		linea_padron_parseada = parsear_linea_csv(linea_padron, 2);
 		char* tipo_doc = obtener_columna(linea_padron_parseada, 0);
@@ -301,8 +271,10 @@ char abrir(mesa_t* mesa, parametros_t* parametros) {
 		linea_padron = leer_linea(csv_padron);
 	}
 	// Cierro el archivo de padrones porque ya terminé de trabajar con él
+	destruir_fila_csv(linea_padron_parseada, false);
 	free(linea_padron);
 	fclose(csv_padron);
+	mesa->boletas = vector_boletas;
 	mesa->votantes = lista_padrones;
 	cola_t* cola_votantes = cola_crear();
 	mesa->votantes_en_espera = cola_votantes;
@@ -318,8 +290,7 @@ char ingresar(mesa_t* mesa, parametros_t* parametros) {
 	if (atoi(nro_doc) <= 0) return 4;
 	votante_t* votante = votante_crear(tipo_doc, nro_doc);
 	cola_encolar(mesa->votantes_en_espera, votante);
-	return 0;
-	lista_iter_t* votantes_iter = lista_iter_crear(mesa->votantes);
+	/*lista_iter_t* votantes_iter = lista_iter_crear(mesa->votantes);
 	while (!lista_iter_al_final(votantes_iter)) {
 		votante_t* votante = lista_iter_ver_actual(votantes_iter);
 		if ((strcmp(votante->tipo_doc, tipo_doc) == 0) && (strcmp(votante->nro_doc, nro_doc) == 0)) {
@@ -330,8 +301,8 @@ char ingresar(mesa_t* mesa, parametros_t* parametros) {
 		}
 		lista_iter_avanzar(votantes_iter);
 	}
-	lista_iter_destruir(votantes_iter);
-	return 10;
+	lista_iter_destruir(votantes_iter);*/
+	return 0;
 }
 
 
@@ -339,30 +310,29 @@ char ingresar(mesa_t* mesa, parametros_t* parametros) {
 // correctos, y segun si lo son o no, realiza un cierto
 // proceso, devolviendo el numero de error (o cero) en donde corresponda.
 char votar(mesa_t* mesa, parametros_t* parametros) {
-	char num_error = 10;
 	if (!mesa_esta_abierta(mesa)) return 3;
-	if (!mesa->votantes_en_espera) return 7;
-	if (parametros->param2 != NULL || !parametros->param1) return num_error; // 'votar' lleva solamente un parametro (no puede ser mas de uno, tampoco ninguno).
+	if (parametros->param2 != NULL || !parametros->param1) return 10; // 'votar' lleva solamente un parametro (no puede ser mas de uno, tampoco ninguno).
 	if (strcmp(parametros->param1, "inicio") == 0){
-		num_error = iniciar_votacion(mesa);
-		if (!num_error){ // Si inicio el proceso de votacion (no hay error -> num_error = 0)
-			votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
-			char* operacion = "presidente";
-			pila_apilar(votante->operaciones, operacion); // "La persona esta votando al presidente".
-			votar_candidato(mesa, 1);
-		}
-		return num_error;
+		if (cola_esta_vacia(mesa->votantes_en_espera)) return 7;
+		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
+		char* operacion = "presidente";
+		pila_apilar(votante->operaciones, operacion); // "La persona esta votando al presidente".
+		votar_candidato(mesa, 1);
+		return -1; // Devuelvo -1 para que no me imprima OK
 	}
 	else if (strcmp(parametros->param1, "deshacer") == 0){
-		num_error = iniciar_votacion(mesa);
-		if (num_error != 0) return num_error;
+		if (cola_esta_vacia(mesa->votantes_en_espera)) return 8;
 		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
-		if (strcmp((char*) pila_ver_tope(votante->operaciones), "presidente") == 0) return 8;
-		size_t operacion = 0;
-		while (operacion == 0){
-			operacion = (size_t) atoi(pila_desapilar(votante->operaciones)); // Desapilamos hasta que encuentre un numero, asi borra lo votado.
+		char* operacion = pila_ver_tope(votante->operaciones);
+		if (!operacion) return 3;
+		if (strcmp(operacion, "presidente") == 0) return 8;
+		size_t id_partido = 0;
+		while (id_partido == 0){
+			pila_desapilar(votante->operaciones); // Descarto la desapilación 'presidente'/'gobernador'/'intendente'
+			size_t* id_partido = pila_desapilar(votante->operaciones);
+			printf("nro_operacion: %zu\n", *id_partido);
 		}
-		partido_t* partido = vector_obtener(mesa->boletas, operacion - 1);
+		partido_t* partido = vector_obtener(mesa->boletas, id_partido - 1);
 		if (strcmp((char*) pila_ver_tope(votante->operaciones), "presidente") == 0){
 			partido->votos_presi--;
 			votar_candidato(mesa, 1);
@@ -378,39 +348,43 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 		}
 		return 0;
 	}
+	else if (strcmp(parametros->param1, "fin") == 0){
+		if (cola_esta_vacia(mesa->votantes_en_espera)) return 10;
+		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
+		if (!votante->ya_voto) return 9;
+		cola_desencolar(mesa->votantes_en_espera);
+		return 0;
+	}
 	else if ((0 < atoi(parametros->param1)) <= vector_cantidad_elementos(mesa->boletas)){
-		num_error = iniciar_votacion(mesa);
-		if (num_error != 0) return num_error;
 		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
 		size_t id_partido = (size_t) atoi(parametros->param1);
 		char* operacion = pila_ver_tope(votante->operaciones);
 		if (!operacion) return 3;
-		partido_t* partido = vector_obtener(mesa->boletas, id_partido);
-		if (strcmp(operacion, "presidente") == 0){
+		partido_t* partido = vector_obtener(mesa->boletas, id_partido - 1);
+		if (strcmp(operacion, "presidente") == 0) {
 			pila_apilar(votante->operaciones, &id_partido);
 			operacion = "gobernador";
-			pila_apilar(votante->operaciones, &operacion);
+			pila_apilar(votante->operaciones, operacion);
 			partido->votos_presi++;
+			printf("OK\n");
+			votar_candidato(mesa, 2);
+			return -1; // Devuelvo -1 para que no me imprima OK
 		}
 		else if (strcmp(operacion, "gobernador") == 0){
 			pila_apilar(votante->operaciones, &id_partido);
 			operacion = "intendente";
-			pila_apilar(votante->operaciones, &operacion);
+			pila_apilar(votante->operaciones, operacion);
 			partido->votos_gober++;
+			printf("OK\n");
+			votar_candidato(mesa, 3);
+			return -1; // Devuelvo -1 para que no me imprima OK
 		}
 		else if (strcmp(operacion, "intendente") == 0){
 			pila_apilar(votante->operaciones, &id_partido);
 			partido->votos_inten++;
 			votante->ya_voto = true;
 		}
-	}
-	else if (strcmp(parametros->param1, "fin") == 0){
-		num_error = iniciar_votacion(mesa);
-		if (num_error != 0) return num_error;
-		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
-		if (!mesa_esta_abierta(mesa)) return 3;
-		if (!pila_ver_tope(votante->operaciones)) return 10;
-		if (!votante->ya_voto) return 9;
+		else if (strcmp(operacion, "intendente") == 0) return 10;
 		return 0;
 	}
 	return 10;
@@ -421,10 +395,9 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 // en espera ya votaron), e imprime el resultado de las elecciones.
 char cerrar(mesa_t* mesa, parametros_t* parametros) {
 	if (parametros->param2 != NULL || parametros->param1 != NULL) return 10; // 'cerrar' no lleva parametros.
-	if (!cola_esta_vacia(mesa->votantes_en_espera) || !lista_esta_vacia(mesa->votantes)) return 11;
-	printf ("Resultados votacion:\n");
+	if (!cola_esta_vacia(mesa->votantes_en_espera)) return 11;
 	imprimir_resultado(mesa);
-	return 0;
+	return -1; // Devuelvo -1 para que no me imprima OK
 }
 
 int main(void) {
@@ -445,7 +418,7 @@ int main(void) {
 						}
 		if (parametros->comando) {
 			if (resultado == 0) printf("OK\n");
-			else printf("ERROR%d\n", resultado);
+			else if (resultado != -1) printf("ERROR%d\n", resultado);
 			if ((strcmp(parametros->comando, "cerrar") == 0) && (resultado == 0)) fin = true;
 		}
 		free(linea);
