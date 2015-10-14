@@ -108,6 +108,7 @@
 <votar 1
 >OK
 <votar fin
+>OK
 <votar inicio
 >Cargo: Presidente
 >1: Libertinaje determinante: Toban Lapjt
@@ -140,5 +141,6 @@
 <votar 6
 >OK
 <votar fin
+>OK
 <votar inicio
 >ERROR6
