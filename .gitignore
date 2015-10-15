@@ -33,3 +33,7 @@
 
 # Informes
 *.pdf
+*.tex
+*.aux
+*.synctex
+informe.txt
