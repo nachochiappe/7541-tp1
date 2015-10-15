@@ -99,8 +99,7 @@ votante_t* votante_crear(char* tipo_doc, char* nro_doc) {
 	votante->nro_doc = nro_doc;
 	votante->ya_voto = false;
 	votante->en_cola = 0;
-	pila_t* pila_operaciones = pila_crear();
-	votante->operaciones = pila_operaciones;
+	votante->operaciones = pila_crear();
 	return votante;
 }
 
@@ -145,13 +144,12 @@ void partido_destruir(partido_t *partido, void destruir_dato(void*)){
 
 parametros_t* obtener_parametros(char* linea) {
 	const char delim[2] = " ";
-	char* param;
 	parametros_t* parametros = malloc(sizeof(parametros_t));
 	if (!parametros) return NULL;
 	parametros->comando = NULL;
 	parametros->param1 = NULL;
 	parametros->param2 = NULL;
-	param = strtok(linea, delim);
+	char* param = strtok(linea, delim);
 	parametros->comando = param;
 	if (param) {
 		param = strtok(NULL, delim);
@@ -322,9 +320,9 @@ char abrir(mesa_t* mesa, parametros_t* parametros) {
 char ingresar(mesa_t* mesa, parametros_t* parametros) {
 	if (!mesa_esta_abierta(mesa)) return 3;
 	if ((!parametros->param1) || (!parametros->param2)) return 4;
+	if (atoi(parametros->param2) <= 0) return 4;
 	char* tipo_doc = strcpy(malloc(strlen(parametros->param1) + 1), parametros->param1); // Si no se copian, le pasa la direccion de memoria de los parametros
 	char* nro_doc = strcpy(malloc(strlen(parametros->param2) + 1), parametros->param2); // a votante_crear, y terminaba guardando los parametros en el tipo de documento.
-	if (atoi(nro_doc) <= 0) return 4;
 	votante_t* votante_en_espera = votante_crear(tipo_doc, nro_doc);
 	lista_iter_t* votantes_iter = lista_iter_crear(mesa->votantes);
 	while (!lista_iter_al_final(votantes_iter)) {
@@ -400,13 +398,14 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 		char* operacion = pila_ver_tope(votante->operaciones);
 		if (!operacion) return 10;
 		if (!votante->ya_voto) return 9;
-		cola_desencolar(mesa->votantes_en_espera);
+		votante = cola_desencolar(mesa->votantes_en_espera);
+		votante_destruir(votante, NULL);
 		return 0;
 	}
 	else if ((0 < atoi(parametros->param1)) <= vector_cantidad_elementos(mesa->boletas)){
 		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
 		size_t id_partido = (size_t) atoi(parametros->param1);
-		char partido_votado[500];
+		char partido_votado[300]; // Suficiente para guardar el entero
 		sprintf (partido_votado, "%d", (int) id_partido); // Asi, apilamos cadenas en vez de enteros.
 		char* operacion = pila_ver_tope(votante->operaciones);
 		if (!operacion) return 10;
