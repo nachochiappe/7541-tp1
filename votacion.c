@@ -106,6 +106,8 @@ votante_t* votante_crear(char* tipo_doc, char* nro_doc) {
 
 void votante_destruir(votante_t *votante, void destruir_dato(void*)) {
 	pila_destruir(votante->operaciones);
+	free(votante->tipo_doc);
+	free(votante->nro_doc);
 	free(votante);
 }
 
@@ -129,6 +131,11 @@ partido_t* partido_crear(char* id_partido, char* nombre_partido, char* president
 }
 
 void partido_destruir(partido_t *partido, void destruir_dato(void*)){
+	free(partido->id_partido);
+	free(partido->nombre_partido);
+	free(partido->presidente);
+	free(partido->gobernador);
+	free(partido->intendente);
 	free(partido);
 }
 
@@ -206,6 +213,7 @@ bool verificar_votante_en_padron(votante_t* votante){
 	bool en_padron = false;
 	FILE *csv_padron = fopen(ARCHIVO_PADRON, "r");
 	char* linea_padron = leer_linea(csv_padron);
+	free(linea_padron);
 	// Hago una nueva lectura, ya que descarto la primera porque es la cabecera
 	linea_padron = leer_linea(csv_padron);
 	fila_csv_t* linea_padron_parseada;
@@ -216,14 +224,16 @@ bool verificar_votante_en_padron(votante_t* votante){
 		if (strcmp(tipo_doc, votante->tipo_doc) == 0){
 			if (strcmp(nro_doc, votante->nro_doc) == 0){
 				en_padron = true;
+				destruir_fila_csv(linea_padron_parseada, true);
 				break;
 			}
 		}
+		free(linea_padron);
 		linea_padron = leer_linea(csv_padron);
+		destruir_fila_csv(linea_padron_parseada, true);
 	}
-	// Cierro el archivo de padrones porque ya terminé de trabajar con él
-	destruir_fila_csv(linea_padron_parseada, false);
 	free(linea_padron);
+	// Cierro el archivo de padrones porque ya terminé de trabajar con él
 	fclose(csv_padron);
 	return en_padron;
 }
