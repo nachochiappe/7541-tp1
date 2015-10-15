@@ -25,7 +25,7 @@ pila.o: pila.c pila.h
 	$(CC) $(CFLAGS) -c pila.c
 
 vector_dinamico.o: vector_dinamico.c vector_dinamico.h
-	$(CC) $(CFLAGS) -c cola.c
+	$(CC) $(CFLAGS) -c vector_dinamico.c
 
 votacion.o: votacion.c votacion.h
 	$(CC) $(CFLAGS) -c votacion.c
