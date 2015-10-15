@@ -31,7 +31,7 @@ votacion.o: votacion.c votacion.h
 	$(CC) $(CFLAGS) -c votacion.c
 
 $(EXEC): $(OBJECTS)
-	$(CC) $(CFLAGS) $(OBJECTS) *.c -o $(EXEC)
+	$(CC) $(CFLAGS) $(OBJECTS) -o $(EXEC)
 
 valgrind: $(EXEC)
 	$(VALGRIND) ./$(EXEC)
