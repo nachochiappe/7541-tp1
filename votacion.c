@@ -83,7 +83,7 @@ void destruir_votante(void* dato){
 void mesa_destruir(mesa_t *mesa, void destruir_dato(void*)) {
 	vector_destruir(mesa->boletas, destruir_partido);
 	lista_destruir(mesa->votantes, destruir_votante);
-	cola_destruir(mesa->votantes_en_espera, NULL);
+	cola_destruir(mesa->votantes_en_espera, destruir_votante);
 	free(mesa);
 }
 
@@ -105,12 +105,6 @@ votante_t* votante_crear(char* tipo_doc, char* nro_doc) {
 }
 
 void votante_destruir(votante_t *votante, void destruir_dato(void*)) {
-	/*void* elemento;
-	while (!cola_esta_vacia(cola)) {
-		elemento = cola_desencolar(cola);
-		if (destruir_dato)
-			destruir_dato(elemento);
-	}*/
 	pila_destruir(votante->operaciones);
 	free(votante);
 }
@@ -206,109 +200,8 @@ void imprimir_resultado(mesa_t* mesa){
 	}
 }
 
-/*************************************
-*       PRIMITIVAS PRINCIPALES       *
-**************************************/
-
-char abrir(mesa_t* mesa, parametros_t* parametros) {
-	// Confirmo que la lectura de parámetros fue correcta
-	if ((!parametros->param1) || (!parametros->param2)) return 1;
-	if (mesa_esta_abierta(mesa)) return 2;
-	char* archivo_lista_csv = parametros->param1;
-	char* archivo_padron_csv = parametros->param2;
-	if ((strcmp(archivo_lista_csv, ARCHIVO_LISTA) != 0) || (strcmp(archivo_padron_csv, ARCHIVO_PADRON) != 0)) return 1;
-	
-	// Confirmo que ambos archivos existen
-	FILE *csv_lista = fopen(ARCHIVO_LISTA, "r");
-	if (!csv_lista) return 1;
-	FILE *csv_padron = fopen(ARCHIVO_PADRON, "r");
-	if (!csv_padron) return 1;
-	
-	// Proceso el archivo de lista de boletas
-	char* linea_lista = leer_linea(csv_lista);
-	// Creo un vector dinámico de tamaño MIN_CANT_PARTIDOS
-	// Lo voy a redimensionar en caso de que haya más de 5 partidos
-	vector_t* vector_boletas = vector_crear(MIN_CANT_PARTIDOS);
-	size_t cant_partidos = 0;
-	// Hago una nueva lectura, ya que descarto la primera porque es la cabecera
-	linea_lista = leer_linea(csv_lista);
-	fila_csv_t* linea_lista_parseada;
-	while (linea_lista) {
-		linea_lista_parseada = parsear_linea_csv(linea_lista, 5);
-		char* id_partido = obtener_columna(linea_lista_parseada, 0);
-		char* nombre_partido = obtener_columna(linea_lista_parseada, 1);
-		char* presidente = obtener_columna(linea_lista_parseada, 2);
-		char* gobernador = obtener_columna(linea_lista_parseada, 3);
-		char* intendente = obtener_columna(linea_lista_parseada, 4);
-		partido_t* partido = partido_crear(id_partido, nombre_partido, presidente, gobernador, intendente);
-		if (cant_partidos == vector_obtener_tamanio(vector_boletas)){ 
-			if (!vector_redimensionar(vector_boletas, cant_partidos + MIN_CANT_PARTIDOS)) {
-				fclose(csv_lista);
-				fclose(csv_padron);
-				destruir_fila_csv(linea_lista_parseada, false);
-				return 10; // Fallo la redimension
-			}
-		}
-		vector_guardar(vector_boletas, cant_partidos, partido); // Guarda en un vector dinamico de punteros genericos, un puntero al partido.
-		cant_partidos++;
-		linea_lista = leer_linea(csv_lista);
-	}
-	// Cierro el archivo de lista porque ya terminé de trabajar con él
-	destruir_fila_csv(linea_lista_parseada, false);
-	free(linea_lista);
-	fclose(csv_lista);
-	
-	// Proceso el archivo de padrones
-	char* linea_padron = leer_linea(csv_padron);
-	lista_t* lista_padrones = lista_crear();
-	// Hago una nueva lectura, ya que descarto la primera porque es la cabecera
-	linea_padron = leer_linea(csv_padron);
-	fila_csv_t* linea_padron_parseada;
-	while (linea_padron) {
-		linea_padron_parseada = parsear_linea_csv(linea_padron, 2);
-		char* tipo_doc = obtener_columna(linea_padron_parseada, 0);
-		char* nro_doc = obtener_columna(linea_padron_parseada, 1);
-		votante_t* votante = votante_crear(tipo_doc, nro_doc);
-		lista_insertar_primero(lista_padrones, votante);
-		linea_padron = leer_linea(csv_padron);
-	}
-	// Cierro el archivo de padrones porque ya terminé de trabajar con él
-	destruir_fila_csv(linea_padron_parseada, false);
-	free(linea_padron);
-	fclose(csv_padron);
-	mesa->boletas = vector_boletas;
-	mesa->votantes = lista_padrones;
-	cola_t* cola_votantes = cola_crear();
-	mesa->votantes_en_espera = cola_votantes;
-	mesa->abierta = true;
-	return 0;
-}
-
-char ingresar(mesa_t* mesa, parametros_t* parametros) {
-	if (!mesa_esta_abierta(mesa)) return 3;
-	if ((!parametros->param1) || (!parametros->param2)) return 4;
-	char* tipo_doc = strcpy(malloc(strlen(parametros->param1) + 1), parametros->param1); // Si no se copian, le pasa la direccion de memoria de los parametros
-	char* nro_doc = strcpy(malloc(strlen(parametros->param2) + 1), parametros->param2); // a votante_crear, y terminaba guardando los parametros en el tipo de documento.
-	if (atoi(nro_doc) <= 0) return 4;
-	votante_t* votante_en_espera = votante_crear(tipo_doc, nro_doc);
-	lista_iter_t* votantes_iter = lista_iter_crear(mesa->votantes);
-	while (!lista_iter_al_final(votantes_iter)) {
-		votante_t* votante = lista_iter_ver_actual(votantes_iter);
-		if ((strcmp(votante->tipo_doc, tipo_doc) == 0) && (strcmp(votante->nro_doc, nro_doc) == 0)) {
-			if (votante->en_cola > 0){
-				votante_en_espera->ya_voto = true; // Esto es, dado a que se desencola una vez que ya voto.
-				break;
-			}
-			votante->en_cola++;
-			break;
-		}
-		lista_iter_avanzar(votantes_iter);
-	}
-	lista_iter_destruir(votantes_iter);
-	cola_encolar(mesa->votantes_en_espera, votante_en_espera);
-	return 0;
-}
-
+/* Devuelve true o false segun si el votante pasado por
+ * parametro esta o no en el archivo ARCHIVO_PADRON.*/ 
 bool verificar_votante_en_padron(votante_t* votante){
 	bool en_padron = false;
 	FILE *csv_padron = fopen(ARCHIVO_PADRON, "r");
@@ -334,6 +227,113 @@ bool verificar_votante_en_padron(votante_t* votante){
 	fclose(csv_padron);
 	return en_padron;
 }
+
+/*************************************
+*       PRIMITIVAS PRINCIPALES       *
+**************************************/
+
+char abrir(mesa_t* mesa, parametros_t* parametros) {
+	// Confirmo que la lectura de parámetros fue correcta
+	if ((!parametros->param1) || (!parametros->param2)) return 1;
+	if (mesa_esta_abierta(mesa)) return 2;
+	char* archivo_lista_csv = parametros->param1;
+	char* archivo_padron_csv = parametros->param2;
+	if ((strcmp(archivo_lista_csv, ARCHIVO_LISTA) != 0) || (strcmp(archivo_padron_csv, ARCHIVO_PADRON) != 0)) return 1;
+	
+	// Confirmo que ambos archivos existen
+	FILE *csv_lista = fopen(ARCHIVO_LISTA, "r");
+	if (!csv_lista) return 1;
+	FILE *csv_padron = fopen(ARCHIVO_PADRON, "r");
+	if (!csv_padron) return 1;
+	
+	// Proceso el archivo de lista de boletas
+	char* linea_lista = leer_linea(csv_lista);
+	free(linea_lista);
+	// Creo un vector dinámico de tamaño MIN_CANT_PARTIDOS
+	// Lo voy a redimensionar en caso de que haya más de 5 partidos
+	vector_t* vector_boletas = vector_crear(MIN_CANT_PARTIDOS);
+	size_t cant_partidos = 0;
+	// Hago una nueva lectura, ya que descarto la primera porque es la cabecera
+	linea_lista = leer_linea(csv_lista);
+	fila_csv_t* linea_lista_parseada;
+	while (linea_lista) {
+		linea_lista_parseada = parsear_linea_csv(linea_lista, 5);
+		char* id_partido = obtener_columna(linea_lista_parseada, 0);
+		char* nombre_partido = obtener_columna(linea_lista_parseada, 1);
+		char* presidente = obtener_columna(linea_lista_parseada, 2);
+		char* gobernador = obtener_columna(linea_lista_parseada, 3);
+		char* intendente = obtener_columna(linea_lista_parseada, 4);
+		partido_t* partido = partido_crear(id_partido, nombre_partido, presidente, gobernador, intendente);
+		if (cant_partidos == vector_obtener_tamanio(vector_boletas)){ 
+			if (!vector_redimensionar(vector_boletas, cant_partidos + MIN_CANT_PARTIDOS)) {
+				fclose(csv_lista);
+				fclose(csv_padron);
+				free(linea_lista);
+				destruir_fila_csv(linea_lista_parseada, false);
+				return 10; // Fallo la redimension
+			}
+		}
+		vector_guardar(vector_boletas, cant_partidos, partido); // Guarda en un vector dinamico de punteros genericos, un puntero al partido.
+		cant_partidos++;
+		destruir_fila_csv(linea_lista_parseada, false);
+		free(linea_lista);
+		linea_lista = leer_linea(csv_lista);
+	}
+	// Cierro el archivo de lista porque ya terminé de trabajar con él
+	fclose(csv_lista);
+	
+	// Proceso el archivo de padrones
+	char* linea_padron = leer_linea(csv_padron);
+	free(linea_padron);
+	lista_t* lista_padrones = lista_crear();
+	// Hago una nueva lectura, ya que descarto la primera porque es la cabecera
+	linea_padron = leer_linea(csv_padron);
+	fila_csv_t* linea_padron_parseada;
+	while (linea_padron) {
+		linea_padron_parseada = parsear_linea_csv(linea_padron, 2);
+		char* tipo_doc = obtener_columna(linea_padron_parseada, 0);
+		char* nro_doc = obtener_columna(linea_padron_parseada, 1);
+		votante_t* votante = votante_crear(tipo_doc, nro_doc);
+		lista_insertar_primero(lista_padrones, votante);
+		free(linea_padron);
+		linea_padron = leer_linea(csv_padron);
+		destruir_fila_csv(linea_padron_parseada, false);
+	}
+	// Cierro el archivo de padrones porque ya terminé de trabajar con él
+	fclose(csv_padron);
+	mesa->boletas = vector_boletas;
+	mesa->votantes = lista_padrones;
+	cola_t* cola_votantes = cola_crear();
+	mesa->votantes_en_espera = cola_votantes;
+	mesa->abierta = true;
+	return 0;
+}
+
+char ingresar(mesa_t* mesa, parametros_t* parametros) {
+	if (!mesa_esta_abierta(mesa)) return 3;
+	if ((!parametros->param1) || (!parametros->param2)) return 4;
+	char* tipo_doc = strcpy(malloc(strlen(parametros->param1) + 1), parametros->param1); // Si no se copian, le pasa la direccion de memoria de los parametros
+	char* nro_doc = strcpy(malloc(strlen(parametros->param2) + 1), parametros->param2); // a votante_crear, y terminaba guardando los parametros en el tipo de documento.
+	if (atoi(nro_doc) <= 0) return 4;
+	votante_t* votante_en_espera = votante_crear(tipo_doc, nro_doc);
+	lista_iter_t* votantes_iter = lista_iter_crear(mesa->votantes);
+	while (!lista_iter_al_final(votantes_iter)) {
+		votante_t* votante = lista_iter_ver_actual(votantes_iter);
+		if ((strcmp(votante->tipo_doc, tipo_doc) == 0) && (strcmp(votante->nro_doc, nro_doc) == 0)) {
+			if (votante->en_cola > 0){ // Si el votante ya estuvo en la cola, seguramente ya haya votado,
+				votante_en_espera->ya_voto = true; // dado a que se lo desencola una vez que ya voto.
+				break;
+			}
+			votante->en_cola++;
+			break;
+		}
+		lista_iter_avanzar(votantes_iter);
+	}
+	lista_iter_destruir(votantes_iter);
+	cola_encolar(mesa->votantes_en_espera, votante_en_espera);
+	return 0;
+}
+
 
 // Funcion de votar. Verifica que los parametros pasados sean
 // correctos, y segun si lo son o no, realiza un cierto
@@ -361,26 +361,28 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 		if (!operacion) return 10;
 		if (strcmp(operacion, "presidente") == 0) return 8;
 		size_t id_partido = 0;
-		while (id_partido == 0){
-			pila_desapilar(votante->operaciones); // Descarto la desapilación 'presidente'/'gobernador'/'intendente'
-			size_t* id_partido = pila_desapilar(votante->operaciones);
-			printf("nro_operacion: %zu\n", *id_partido);
+		while (id_partido == 0){ // Habia un problema aca por apilar enteros (size_t) en vez de una cadena.
+			if (!pila_ver_tope(votante->operaciones)) return 8;
+			id_partido = (size_t) atoi(pila_desapilar(votante->operaciones));
 		}
 		partido_t* partido = vector_obtener(mesa->boletas, id_partido - 1);
 		if (strcmp((char*) pila_ver_tope(votante->operaciones), "presidente") == 0){
 			partido->votos_presi--;
+			printf("OK\n");
 			votar_candidato(mesa, 1);
 		}
 		else if (strcmp((char*) pila_ver_tope(votante->operaciones), "gobernador") == 0){
 			partido->votos_gober--;
+			printf("OK\n");
 			votar_candidato(mesa, 2);
 		}
 		else{
 			votante->ya_voto = false;
 			partido->votos_inten--;
+			printf("OK\n");
 			votar_candidato(mesa, 3);
 		}
-		return 0;
+		return -1;
 	}
 	else if (strcmp(parametros->param1, "fin") == 0){
 		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
@@ -394,11 +396,13 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 	else if ((0 < atoi(parametros->param1)) <= vector_cantidad_elementos(mesa->boletas)){
 		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
 		size_t id_partido = (size_t) atoi(parametros->param1);
+		char partido_votado[500];
+		sprintf (partido_votado, "%d", (int) id_partido); // Asi, apilamos cadenas en vez de enteros.
 		char* operacion = pila_ver_tope(votante->operaciones);
 		if (!operacion) return 10;
 		partido_t* partido = vector_obtener(mesa->boletas, id_partido - 1);
 		if (strcmp(operacion, "presidente") == 0) {
-			pila_apilar(votante->operaciones, &id_partido);
+			pila_apilar(votante->operaciones, partido_votado);
 			operacion = "gobernador";
 			pila_apilar(votante->operaciones, operacion);
 			partido->votos_presi++;
@@ -407,7 +411,7 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 			return -1; // Devuelvo -1 para que no me imprima OK
 		}
 		else if (strcmp(operacion, "gobernador") == 0){
-			pila_apilar(votante->operaciones, &id_partido);
+			pila_apilar(votante->operaciones, partido_votado);
 			operacion = "intendente";
 			pila_apilar(votante->operaciones, operacion);
 			partido->votos_gober++;
@@ -416,7 +420,7 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 			return -1; // Devuelvo -1 para que no me imprima OK
 		}
 		else if (strcmp(operacion, "intendente") == 0){
-			pila_apilar(votante->operaciones, &id_partido);
+			pila_apilar(votante->operaciones, partido_votado);
 			partido->votos_inten++;
 			votante->ya_voto = true;
 			printf("OK\n");
