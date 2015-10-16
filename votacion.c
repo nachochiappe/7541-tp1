@@ -104,6 +104,10 @@ votante_t* votante_crear(char* tipo_doc, char* nro_doc) {
 }
 
 void votante_destruir(votante_t *votante, void destruir_dato(void*)) {
+	while (!pila_esta_vacia(votante->operaciones)){
+		char* operacion = pila_desapilar(votante->operaciones);
+		if (strlen(operacion) == 1) free(operacion); // Verificamos si la operacion guardada es un numero (se uso malloc para guardarlo en cadena).
+	}
 	pila_destruir(votante->operaciones);
 	free(votante->tipo_doc);
 	free(votante->nro_doc);
@@ -369,9 +373,11 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 		if (!operacion) return 10;
 		if (strcmp(operacion, "presidente") == 0) return 8;
 		size_t id_partido = 0;
-		while (id_partido != 1){ // Habia un problema aca por apilar enteros (size_t) en vez de una cadena.
+		while (id_partido != 1){ // Si el id partidos es 1, es porque la cadena era un digito (era el id del partido).
 			if (!pila_ver_tope(votante->operaciones)) return 8;
-			id_partido = strlen((char*) pila_desapilar(votante->operaciones));
+			operacion = pila_desapilar(votante->operaciones);
+			id_partido = strlen(operacion);
+			if (id_partido == 1) free(operacion); // Si se desapila un numero, liberamos la memoria pedida para este.
 		}
 		partido_t* partido = vector_obtener(mesa->boletas, id_partido - 1);
 		if (strcmp((char*) pila_ver_tope(votante->operaciones), "presidente") == 0){
@@ -404,11 +410,10 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 	}
 	else if ((0 < atoi(parametros->param1)) <= vector_cantidad_elementos(mesa->boletas)){
 		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
-		size_t id_partido = (size_t) atoi(parametros->param1);
-		char partido_votado[300]; // Suficiente para guardar el entero
-		sprintf (partido_votado, "%i", (int) id_partido); // Asi, apilamos cadenas en vez de enteros.
 		char* operacion = pila_ver_tope(votante->operaciones);
 		if (!operacion) return 10;
+		size_t id_partido = (size_t) atoi(parametros->param1);
+		char* partido_votado = strcpy(malloc(2), parametros->param1); // Pedimos memoria para copiar el numero y el NULL al final ('\0').
 		partido_t* partido = vector_obtener(mesa->boletas, id_partido - 1);
 		if (strcmp(operacion, "presidente") == 0) {
 			pila_apilar(votante->operaciones, partido_votado);
