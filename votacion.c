@@ -369,9 +369,9 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 		if (!operacion) return 10;
 		if (strcmp(operacion, "presidente") == 0) return 8;
 		size_t id_partido = 0;
-		while (id_partido == 0){ // Habia un problema aca por apilar enteros (size_t) en vez de una cadena.
+		while (id_partido != 1){ // Habia un problema aca por apilar enteros (size_t) en vez de una cadena.
 			if (!pila_ver_tope(votante->operaciones)) return 8;
-			id_partido = (size_t) atoi(pila_desapilar(votante->operaciones));
+			id_partido = strlen((char*) pila_desapilar(votante->operaciones));
 		}
 		partido_t* partido = vector_obtener(mesa->boletas, id_partido - 1);
 		if (strcmp((char*) pila_ver_tope(votante->operaciones), "presidente") == 0){
@@ -406,7 +406,7 @@ char votar(mesa_t* mesa, parametros_t* parametros) {
 		votante_t* votante = cola_ver_primero(mesa->votantes_en_espera);
 		size_t id_partido = (size_t) atoi(parametros->param1);
 		char partido_votado[300]; // Suficiente para guardar el entero
-		sprintf (partido_votado, "%d", (int) id_partido); // Asi, apilamos cadenas en vez de enteros.
+		sprintf (partido_votado, "%i", (int) id_partido); // Asi, apilamos cadenas en vez de enteros.
 		char* operacion = pila_ver_tope(votante->operaciones);
 		if (!operacion) return 10;
 		partido_t* partido = vector_obtener(mesa->boletas, id_partido - 1);
