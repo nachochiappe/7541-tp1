@@ -1,4 +1,4 @@
-#Makefile - TP1 (Sistema de Votación)
+#Makefile - TP1 (Sistema de Votacion)
 
 #Variables:
 EXEC=tp
